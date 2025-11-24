@@ -1,0 +1,91 @@
+apiVersion: v2
+name: devops-platform
+description: Umbrella chart for complete DevOps platform
+type: application
+version: 1.0.0
+appVersion: "1.0"
+keywords:
+  - devops
+  - kubernetes
+  - platform
+  - umbrella
+maintainers:
+  - name: DevOps Team
+dependencies:
+  # Monitoring Stack
+  - name: prometheus
+    version: "25.8.0"
+    repository: "https://prometheus-community.github.io/helm-charts"
+    condition: prometheus.enabled
+    tags:
+      - monitoring
+  
+  - name: grafana
+    version: "7.0.8"
+    repository: "https://grafana.github.io/helm-charts"
+    condition: grafana.enabled
+    tags:
+      - monitoring
+  
+  # GitOps
+  - name: argo-cd
+    version: "5.51.4"
+    repository: "https://argoproj.github.io/argo-helm"
+    condition: argocd.enabled
+    tags:
+      - gitops
+  
+  # Service Mesh
+  - name: istio-base
+    version: "1.20.1"
+    repository: "https://istio-release.storage.googleapis.com/charts"
+    condition: istio.enabled
+    tags:
+      - servicemesh
+  
+  - name: istiod
+    version: "1.20.1"
+    repository: "https://istio-release.storage.googleapis.com/charts"
+    condition: istio.enabled
+    tags:
+      - servicemesh
+  
+  # Ingress
+  - name: nginx-ingress
+    version: "4.9.0"
+    repository: "https://kubernetes.github.io/ingress-nginx"
+    condition: nginx.enabled
+    tags:
+      - ingress
+  
+  # Certificate Management
+  - name: cert-manager
+    version: "v1.13.3"
+    repository: "https://charts.jetstack.io"
+    condition: certManager.enabled
+    tags:
+      - security
+  
+  # Secrets Management
+  - name: sealed-secrets
+    version: "2.14.1"
+    repository: "https://bitnami-labs.github.io/sealed-secrets"
+    condition: sealedSecrets.enabled
+    tags:
+      - security
+  
+  # Container Registry
+  - name: harbor
+    version: "1.14.0"
+    repository: "https://helm.goharbor.io"
+    condition: harbor.enabled
+    tags:
+      - registry
+  
+  # Helm Repository
+  - name: chartmuseum
+    version: "3.10.1"
+    repository: "https://chartmuseum.github.io/charts"
+    condition: chartmuseum.enabled
+    tags:
+      - helm

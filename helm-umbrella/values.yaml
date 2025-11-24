@@ -1,0 +1,81 @@
+# Global configuration
+global:
+  domain: example.com
+  storageClass: standard
+
+# Enable/Disable components
+prometheus:
+  enabled: true
+  alertmanager:
+    enabled: true
+  server:
+    persistentVolume:
+      enabled: true
+      size: 10Gi
+
+grafana:
+  enabled: true
+  adminPassword: admin
+  persistence:
+    enabled: true
+    size: 5Gi
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Prometheus
+          type: prometheus
+          url: http://prometheus-server
+          isDefault: true
+
+argocd:
+  enabled: true
+  server:
+    ingress:
+      enabled: true
+      hosts:
+        - argocd.example.com
+
+istio:
+  enabled: false
+
+nginx:
+  enabled: true
+  controller:
+    service:
+      type: LoadBalancer
+
+certManager:
+  enabled: true
+  installCRDs: true
+
+sealedSecrets:
+  enabled: false
+
+harbor:
+  enabled: false
+  expose:
+    type: ingress
+    ingress:
+      hosts:
+        core: harbor.example.com
+
+chartmuseum:
+  enabled: false
+  env:
+    open:
+      DISABLE_API: false
+      ALLOW_OVERWRITE: true
+  persistence:
+    enabled: true
+    size: 10Gi
+
+# Tags to enable/disable groups
+tags:
+  monitoring: true
+  gitops: true
+  servicemesh: false
+  ingress: true
+  security: true
+  registry: false
+  helm: false

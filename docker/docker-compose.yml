@@ -1,0 +1,160 @@
+version: '3.8'
+
+services:
+  ###############################################################################
+  # RHEL DevOps Toolbox Container
+  ###############################################################################
+  devops-toolbox:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: rhel-devops-toolbox:latest
+    container_name: rhel-devops-toolbox
+    hostname: devops-toolbox
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    
+    # Environment variables
+    environment:
+      - KUBECONFIG=/root/.kube/config
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    
+    # Volumes
+    volumes:
+      # Mount Docker socket (for docker commands)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      
+      # Mount Kubernetes config (if exists)
+      - ${HOME}/.kube:/home/devops/.kube:ro
+      
+      # Mount workspace
+      - ../workspace:/workspace
+      
+      # Mount scripts
+      - ../scripts:/opt/scripts:ro
+      
+      # Mount SSH keys (optional)
+      - ${HOME}/.ssh:/home/devops/.ssh:ro
+      
+      # Mount Git config (optional)
+      - ${HOME}/.gitconfig:/home/devops/.gitconfig:ro
+    
+    # Network
+    networks:
+      - devops-network
+    
+    # Keep container running
+    command: tail -f /dev/null
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+  
+  ###############################################################################
+  # Harbor Registry (Optional)
+  ###############################################################################
+  harbor:
+    image: goharbor/harbor-core:v2.9.1
+    container_name: harbor-registry
+    hostname: harbor
+    profiles:
+      - harbor
+    environment:
+      - HARBOR_ADMIN_PASSWORD=Harbor12345
+    ports:
+      - "8080:8080"
+    networks:
+      - devops-network
+  
+  ###############################################################################
+  # ChartMuseum (Optional)
+  ###############################################################################
+  chartmuseum:
+    image: ghcr.io/helm/chartmuseum:v0.16.0
+    container_name: chartmuseum
+    hostname: chartmuseum
+    profiles:
+      - chartmuseum
+    environment:
+      - DEBUG=1
+      - STORAGE=local
+      - STORAGE_LOCAL_ROOTDIR=/charts
+    ports:
+      - "8081:8080"
+    volumes:
+      - chartmuseum-data:/charts
+    networks:
+      - devops-network
+  
+  ###############################################################################
+  # Prometheus (Optional)
+  ###############################################################################
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: prometheus
+    hostname: prometheus
+    profiles:
+      - monitoring
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - devops-network
+  
+  ###############################################################################
+  # Grafana (Optional)
+  ###############################################################################
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: grafana
+    hostname: grafana
+    profiles:
+      - monitoring
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ../config/grafana:/etc/grafana/provisioning:ro
+    networks:
+      - devops-network
+    depends_on:
+      - prometheus
+
+###############################################################################
+# Networks
+###############################################################################
+networks:
+  devops-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+
+###############################################################################
+# Volumes
+###############################################################################
+volumes:
+  chartmuseum-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local

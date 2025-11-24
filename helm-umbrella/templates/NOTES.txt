@@ -1,0 +1,35 @@
+DevOps Platform Umbrella Chart deployed successfully!
+
+Components installed:
+{{- if .Values.prometheus.enabled }}
+  ✅ Prometheus - Monitoring
+{{- end }}
+{{- if .Values.grafana.enabled }}
+  ✅ Grafana - Visualization
+{{- end }}
+{{- if .Values.argocd.enabled }}
+  ✅ ArgoCD - GitOps
+{{- end }}
+{{- if .Values.istio.enabled }}
+  ✅ Istio - Service Mesh
+{{- end }}
+{{- if .Values.nginx.enabled }}
+  ✅ NGINX - Ingress Controller
+{{- end }}
+{{- if .Values.certManager.enabled }}
+  ✅ cert-manager - Certificate Management
+{{- end }}
+{{- if .Values.harbor.enabled }}
+  ✅ Harbor - Container Registry
+{{- end }}
+{{- if .Values.chartmuseum.enabled }}
+  ✅ ChartMuseum - Helm Repository
+{{- end }}
+
+Access your services:
+  Grafana:    http://grafana.{{ .Values.global.domain }}
+  ArgoCD:     http://argocd.{{ .Values.global.domain }}
+  Prometheus: http://prometheus.{{ .Values.global.domain }}
+
+Get credentials:
+  kubectl get secret -n {{ .Release.Namespace }}
