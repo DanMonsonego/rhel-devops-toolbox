@@ -30,13 +30,28 @@ if command -v kubectl &> /dev/null; then
     fi
 fi
 
+# Detect OS
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+case $OS in
+    linux)
+        OS="linux"
+        ;;
+    darwin)
+        OS="darwin"
+        ;;
+    *)
+        log_error "Unsupported OS: $OS"
+        exit 1
+        ;;
+esac
+
 # Detect architecture
 ARCH=$(uname -m)
 case $ARCH in
     x86_64)
         ARCH="amd64"
         ;;
-    aarch64)
+    aarch64|arm64)
         ARCH="arm64"
         ;;
     *)
@@ -45,7 +60,7 @@ case $ARCH in
         ;;
 esac
 
-log_info "Detected Architecture: $ARCH"
+log_info "Detected OS: $OS, Architecture: $ARCH"
 
 # Get latest stable version
 log_info "Fetching latest stable kubectl version..."
@@ -53,7 +68,7 @@ KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt)
 log_info "Latest stable version: $KUBECTL_VERSION"
 
 # Download kubectl
-DOWNLOAD_URL="https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl"
+DOWNLOAD_URL="https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/${OS}/${ARCH}/kubectl"
 log_info "Downloading kubectl from: $DOWNLOAD_URL"
 
 TMP_DIR=$(mktemp -d)
@@ -68,7 +83,11 @@ curl -L "${DOWNLOAD_URL}.sha256" -o "$TMP_DIR/kubectl.sha256"
 # Verify checksum
 log_info "Verifying checksum..."
 cd "$TMP_DIR"
-echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
+if command -v sha256sum &> /dev/null; then
+    echo "$(cat kubectl.sha256)  kubectl" | sha256sum --check
+else
+    log_warn "Skipping checksum verification (sha256sum not available)"
+fi
 
 # Install kubectl
 log_info "Installing kubectl..."
@@ -80,6 +99,7 @@ if [[ -w "$INSTALL_DIR" ]]; then
 else
     log_warn "Requires sudo to install to $INSTALL_DIR"
     sudo mv kubectl "$INSTALL_DIR/"
+    sudo chmod 0755 "$INSTALL_DIR/kubectl"
 fi
 
 # Verify installation

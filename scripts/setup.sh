@@ -29,18 +29,32 @@ chmod +x "$SCRIPT_DIR"/*.sh
 
 log_section "RHEL 9.3 DevOps Toolbox - Complete Setup"
 
-# Check if running on RHEL
+# Check if running on RHEL or macOS
 if [ -f /etc/os-release ]; then
     . /etc/os-release
     if [[ "$ID" != "rhel" && "$ID" != "centos" && "$ID" != "rocky" && "$ID" != "almalinux" ]]; then
-        log_warn "This script is optimized for RHEL-based systems"
-        log_warn "Detected: $PRETTY_NAME"
-        read -p "Continue anyway? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            exit 1
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            log_info "Detected macOS. Using Homebrew for package management."
+            OS="macos"
+        else
+            log_warn "This script is optimized for RHEL-based systems or macOS"
+            log_warn "Detected: $PRETTY_NAME"
+            read -p "Continue anyway? (y/N): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                exit 1
+            fi
+            OS="unknown"
         fi
+    else
+        OS="rhel"
     fi
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    log_info "Detected macOS. Using Homebrew for package management."
+    OS="macos"
+else
+    log_warn "Unable to detect OS. Assuming RHEL-like system."
+    OS="rhel"
 fi
 
 ###############################################################################
@@ -49,20 +63,41 @@ fi
 update_system() {
     log_section "Updating System Packages"
     
-    log_step "Running system update..."
-    sudo dnf update -y
-    
-    log_step "Installing base dependencies..."
-    sudo dnf install -y \
-        curl wget git vim nano \
-        bash-completion \
-        ca-certificates \
-        openssl openssh-clients \
-        tar gzip unzip \
-        bind-utils net-tools \
-        python3 python3-pip
-    
-    log_info "✅ System updated and base packages installed"
+    if [[ "$OS" == "macos" ]]; then
+        log_step "Checking Homebrew installation..."
+        if ! command -v brew &> /dev/null; then
+            log_info "Installing Homebrew..."
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        fi
+        
+        log_step "Updating Homebrew..."
+        brew update
+        
+        log_step "Installing base dependencies..."
+        brew install \
+            git vim nano \
+            bash-completion \
+            ca-certificates \
+            openssl openssh \
+            python3
+        
+        log_info "✅ Homebrew updated and base packages installed"
+    else
+        log_step "Running system update..."
+        sudo dnf update -y
+        
+        log_step "Installing base dependencies..."
+        sudo dnf install -y \
+            curl wget git vim nano \
+            bash-completion \
+            ca-certificates \
+            openssl openssh-clients \
+            tar gzip unzip \
+            bind-utils net-tools \
+            python3 python3-pip
+        
+        log_info "✅ System updated and base packages installed"
+    fi
 }
 
 ###############################################################################
@@ -71,16 +106,58 @@ update_system() {
 install_k8s_tools() {
     log_section "Installing Kubernetes Tools"
     
-    log_step "Installing kubectl..."
-    "$SCRIPT_DIR/../tools/install-kubectl.sh"
+    log_step "Checking kubectl..."
+    if command -v kubectl &> /dev/null; then
+        CURRENT_VERSION=$(kubectl version --client --short 2>/dev/null | awk '{print $3}' || echo "unknown")
+        log_info "kubectl is already installed (version: ${CURRENT_VERSION})"
+        read -p "Do you want to reinstall/upgrade kubectl? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            log_step "Installing kubectl..."
+            "$SCRIPT_DIR/../tools/install-kubectl.sh"
+        else
+            log_warn "Skipping kubectl installation"
+        fi
+    else
+        log_step "Installing kubectl..."
+        "$SCRIPT_DIR/../tools/install-kubectl.sh"
+    fi
     
-    log_step "Installing helm..."
-    "$SCRIPT_DIR/../tools/install-helm.sh"
+    log_step "Checking helm..."
+    if command -v helm &> /dev/null; then
+        CURRENT_VERSION=$(helm version --short 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
+        log_info "Helm is already installed (version: ${CURRENT_VERSION})"
+        read -p "Do you want to reinstall/upgrade Helm? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            log_step "Installing helm..."
+            "$SCRIPT_DIR/../tools/install-helm.sh"
+        else
+            log_warn "Skipping Helm installation"
+        fi
+    else
+        log_step "Installing helm..."
+        "$SCRIPT_DIR/../tools/install-helm.sh"
+    fi
     
-    log_step "Installing k9s..."
-    "$SCRIPT_DIR/../tools/install-k9s.sh"
+    log_step "Checking k9s..."
+    if command -v k9s &> /dev/null; then
+        CURRENT_VERSION=$(k9s version --short 2>/dev/null | grep Version | awk '{print $2}' || echo "unknown")
+        log_info "k9s is already installed (version: ${CURRENT_VERSION})"
+        read -p "Do you want to reinstall/upgrade k9s? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            log_step "Installing k9s..."
+            "$SCRIPT_DIR/../tools/install-k9s.sh"
+        else
+            log_warn "Skipping k9s installation"
+        fi
+    else
+        log_step "Installing k9s..."
+        "$SCRIPT_DIR/../tools/install-k9s.sh"
+    fi
     
-    log_info "✅ Kubernetes tools installed"
+    log_info "✅ Kubernetes tools checked/installed"
 }
 
 ###############################################################################
@@ -105,13 +182,26 @@ install_container_tools() {
 install_gitops_tools() {
     log_section "Installing GitOps Tools"
     
-    read -p "Install ArgoCD CLI? (y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        log_step "Installing ArgoCD CLI..."
-        "$SCRIPT_DIR/../tools/install-argocd.sh"
+    if command -v argocd &> /dev/null; then
+        CURRENT_VERSION=$(argocd version --client --short 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' || echo "unknown")
+        log_info "ArgoCD CLI is already installed (version: ${CURRENT_VERSION})"
+        read -p "Do you want to reinstall/upgrade ArgoCD CLI? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            log_step "Installing ArgoCD CLI..."
+            "$SCRIPT_DIR/../tools/install-argocd.sh"
+        else
+            log_warn "Skipping ArgoCD CLI installation"
+        fi
     else
-        log_warn "Skipping ArgoCD CLI installation"
+        read -p "Install ArgoCD CLI? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            log_step "Installing ArgoCD CLI..."
+            "$SCRIPT_DIR/../tools/install-argocd.sh"
+        else
+            log_warn "Skipping ArgoCD CLI installation"
+        fi
     fi
 }
 

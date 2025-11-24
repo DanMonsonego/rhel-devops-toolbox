@@ -29,13 +29,28 @@ if command -v argocd &> /dev/null; then
     fi
 fi
 
+# Detect OS
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+case $OS in
+    linux)
+        OS="linux"
+        ;;
+    darwin)
+        OS="darwin"
+        ;;
+    *)
+        log_error "Unsupported OS: $OS"
+        exit 1
+        ;;
+esac
+
 # Detect architecture
 ARCH=$(uname -m)
 case $ARCH in
     x86_64)
         ARCH="amd64"
         ;;
-    aarch64)
+    aarch64|arm64)
         ARCH="arm64"
         ;;
     *)
@@ -44,7 +59,7 @@ case $ARCH in
         ;;
 esac
 
-log_info "Detected Architecture: $ARCH"
+log_info "Detected OS: $OS, Architecture: $ARCH"
 
 # Get latest stable version
 log_info "Fetching latest stable ArgoCD version..."
@@ -52,7 +67,7 @@ ARGOCD_VERSION=$(curl -L -s https://api.github.com/repos/argoproj/argo-cd/releas
 log_info "Latest stable version: $ARGOCD_VERSION"
 
 # Download ArgoCD CLI
-DOWNLOAD_URL="https://github.com/argoproj/argo-cd/releases/download/${ARGOCD_VERSION}/argocd-linux-${ARCH}"
+DOWNLOAD_URL="https://github.com/argoproj/argo-cd/releases/download/${ARGOCD_VERSION}/argocd-${OS}-${ARCH}"
 log_info "Downloading ArgoCD CLI from: $DOWNLOAD_URL"
 
 TMP_DIR=$(mktemp -d)
@@ -70,6 +85,7 @@ if [[ -w "$INSTALL_DIR" ]]; then
 else
     log_warn "Requires sudo to install to $INSTALL_DIR"
     sudo mv "$TMP_DIR/argocd" "$INSTALL_DIR/"
+    sudo chmod 0755 "$INSTALL_DIR/argocd"
 fi
 
 # Verify installation

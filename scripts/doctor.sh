@@ -24,14 +24,15 @@ CHECKS_RUN=0
 check_tool() {
     local tool_name=$1
     local tool_cmd=$2
-    local optional=${3:-false}
+    local version_cmd=${3:-"--version"}
+    local optional=${4:-false}
     
     CHECKS_RUN=$((CHECKS_RUN + 1))
     
     printf "%-30s" "$tool_name:"
     
     if command -v "$tool_cmd" &> /dev/null; then
-        local version=$("$tool_cmd" --version 2>&1 | head -1 || echo "installed")
+        local version=$("$tool_cmd" $version_cmd 2>&1 | head -1 || echo "installed")
         echo -e "${GREEN}✅ $version${NC}"
         return 0
     else
@@ -63,9 +64,9 @@ echo ""
 # Check Core Kubernetes Tools
 ###############################################################################
 echo -e "${BLUE}🔍 Kubernetes Tools:${NC}"
-check_tool "kubectl" "kubectl"
-check_tool "helm" "helm"
-check_tool "k9s" "k9s"
+check_tool "kubectl" "kubectl" "version --client"
+check_tool "helm" "helm" "version --short"
+check_tool "k9s" "k9s" "version --short"
 echo ""
 
 ###############################################################################
@@ -82,14 +83,19 @@ if command -v docker &> /dev/null; then
         ISSUES_FOUND=$((ISSUES_FOUND + 1))
     fi
 fi
-check_tool "docker compose" "docker" "true"
+if docker compose version &> /dev/null; then
+    DOCKER_COMPOSE_VERSION=$(docker compose version 2>&1 | head -1)
+    echo -e "docker compose:              ${GREEN}✅ $DOCKER_COMPOSE_VERSION${NC}"
+else
+    echo -e "docker compose:              ${YELLOW}⚠️  Not available${NC}"
+fi
 echo ""
 
 ###############################################################################
 # Check GitOps Tools
 ###############################################################################
 echo -e "${BLUE}🚀 GitOps Tools:${NC}"
-check_tool "argocd" "argocd" "true"
+check_tool "argocd" "argocd" "version --client --short" "true"
 echo ""
 
 ###############################################################################
@@ -104,7 +110,7 @@ echo ""
 # Check Service Mesh Tools
 ###############################################################################
 echo -e "${BLUE}🕸️  Service Mesh Tools:${NC}"
-check_tool "istioctl" "istioctl" "true"
+check_tool "istioctl" "istioctl" "version --remote=false" "true"
 check_tool "kiali" "kiali" "true"
 echo ""
 
@@ -112,7 +118,7 @@ echo ""
 # Check Monitoring Tools
 ###############################################################################
 echo -e "${BLUE}📊 Monitoring Tools:${NC}"
-check_tool "promtool" "promtool" "true"
+check_tool "promtool" "promtool" "--version" "true"
 check_tool "grafana-cli" "grafana-cli" "true"
 echo ""
 

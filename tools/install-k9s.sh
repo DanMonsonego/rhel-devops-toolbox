@@ -29,13 +29,28 @@ if command -v k9s &> /dev/null; then
     fi
 fi
 
+# Detect OS
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+case $OS in
+    linux)
+        OS="Linux"
+        ;;
+    darwin)
+        OS="Darwin"
+        ;;
+    *)
+        log_error "Unsupported OS: $OS"
+        exit 1
+        ;;
+esac
+
 # Detect architecture
 ARCH=$(uname -m)
 case $ARCH in
     x86_64)
         ARCH="amd64"
         ;;
-    aarch64)
+    aarch64|arm64)
         ARCH="arm64"
         ;;
     *)
@@ -44,7 +59,7 @@ case $ARCH in
         ;;
 esac
 
-log_info "Detected Architecture: $ARCH"
+log_info "Detected OS: $OS, Architecture: $ARCH"
 
 # Get latest release version from GitHub
 log_info "Fetching latest k9s release..."
@@ -52,7 +67,7 @@ LATEST_VERSION=$(curl -s https://api.github.com/repos/derailed/k9s/releases/late
 log_info "Latest version: v$LATEST_VERSION"
 
 # Construct download URL
-FILENAME="k9s_Linux_${ARCH}.tar.gz"
+FILENAME="k9s_${OS}_${ARCH}.tar.gz"
 DOWNLOAD_URL="https://github.com/derailed/k9s/releases/download/v${LATEST_VERSION}/${FILENAME}"
 
 log_info "Downloading k9s from: $DOWNLOAD_URL"
@@ -77,6 +92,7 @@ if [[ -w "$INSTALL_DIR" ]]; then
 else
     log_warn "Requires sudo to install to $INSTALL_DIR"
     sudo mv k9s "$INSTALL_DIR/"
+    sudo chmod 0755 "$INSTALL_DIR/k9s"
 fi
 
 # Verify installation
