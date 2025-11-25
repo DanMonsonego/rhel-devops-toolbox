@@ -1,0 +1,52 @@
+# AlmaLinux 9.3 DevOps Toolbox Dockerfile
+FROM almalinux:9.3
+
+# Install base dependencies and sudo
+RUN dnf update -y && \
+        dnf install -y --allowerasing \
+            curl wget git vim nano bash-completion \
+            ca-certificates openssl openssh-clients \
+            tar gzip unzip bind-utils net-tools \
+            python3 python3-pip sudo yum-utils device-mapper-persistent-data lvm2 \
+            jq && \
+        dnf clean all
+
+# Create user 'orni' with passwordless sudo
+RUN useradd -m -s /bin/bash orni && \
+    echo 'orni ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/orni && \
+    chmod 0440 /etc/sudoers.d/orni
+
+# Install yq
+RUN YQ_VERSION=$(curl -s https://api.github.com/repos/mikefarah/yq/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/') && \
+    curl -fsSL "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64" -o /usr/local/bin/yq && \
+    chmod +x /usr/local/bin/yq
+
+# Install kubectl
+RUN KUBECTL_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt) && \
+    curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" && \
+    install -m 755 kubectl /usr/local/bin/kubectl && \
+    rm kubectl
+
+# Install Helm
+RUN curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+# Install k9s
+RUN K9S_VERSION=$(curl -s https://api.github.com/repos/derailed/k9s/releases/latest | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/') && \
+    curl -LO "https://github.com/derailed/k9s/releases/download/v${K9S_VERSION}/k9s_Linux_amd64.tar.gz" && \
+    tar -xzf k9s_Linux_amd64.tar.gz && \
+    mv k9s /usr/local/bin/ && \
+    rm k9s_Linux_amd64.tar.gz
+
+# Install ArgoCD CLI
+RUN ARGOCD_VERSION=$(curl -s https://api.github.com/repos/argoproj/argo-cd/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/') && \
+    curl -LO "https://github.com/argoproj/argo-cd/releases/download/${ARGOCD_VERSION}/argocd-linux-amd64" && \
+    install -m 755 argocd-linux-amd64 /usr/local/bin/argocd && \
+    rm argocd-linux-amd64
+
+# (Optional) Install istioctl, promtool, chartmuseum, cmctl, harbor-cli as needed
+# Add similar RUN blocks for each tool using their official releases
+
+USER orni
+WORKDIR /home/orni
+
+CMD ["/bin/bash"]
